@@ -53,7 +53,7 @@ class DeepSpeedFlow(FlowSpec):
     val_data = IncludeFile("val_data", default="data/val.csv")
 
     num_parallel = Parameter(
-        "num_parallel", help="Number of nodes in cluster", default=4
+        "num_parallel", help="Number of nodes in cluster", default=8
     )
     
     output_dir = Parameter(
