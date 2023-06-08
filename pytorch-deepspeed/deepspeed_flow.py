@@ -164,7 +164,7 @@ class DeepSpeedFlow(FlowSpec):
         self.next(self.train, num_parallel=self.num_parallel)
         
     @gpu_profile(interval=1)
-    @pip(libraries={"opencv_python_headless": "4.5.5.62", "transformers": "4.25.1"})
+    @pip(libraries={"opencv_python_headless": "4.5.5.62", "transformers": "4.25.1", "ninja": "1.11.1"})
     @environment(
         vars={
             "EN_BATCH": os.getenv("EN_BATCH"),
