@@ -36,8 +36,7 @@ except:
         "conda-forge::pandas": "1.5.3",
         "conda-forge::pytorch-lightning": "1.8.6",
         "conda-forge::scikit-learn": "1.2.2",
-        "conda-forge::deepspeed": "0.9.2",
-        "conda-forge::ninja": "1.11.1"
+        "conda-forge::deepspeed": "0.9.2"
     },
     python="3.10.4",
 )
@@ -53,7 +52,7 @@ class DeepSpeedFlow(FlowSpec):
     val_data = IncludeFile("val_data", default="data/val.csv")
 
     num_parallel = Parameter(
-        "num_parallel", help="Number of nodes in cluster", default=8
+        "num_parallel", help="Number of nodes in cluster", default=6
     )
     
     output_dir = Parameter(
@@ -69,7 +68,7 @@ class DeepSpeedFlow(FlowSpec):
     )
     
     batch_size = Parameter(
-        "batch_size", default=6
+        "batch_size", default=4
     )
     
     max_epochs = Parameter(
@@ -113,7 +112,7 @@ class DeepSpeedFlow(FlowSpec):
     )
     
     precision = Parameter(
-        "precision", default=16
+        "precision", default="bf16"
     )
     
     logger = Parameter(
@@ -129,7 +128,7 @@ class DeepSpeedFlow(FlowSpec):
     )
     
     fp_16 = Parameter(
-        "fp_16", default=True
+        "fp_16", default=False
     )
     
     opt_level = Parameter(
