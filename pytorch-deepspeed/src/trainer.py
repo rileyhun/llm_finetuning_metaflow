@@ -142,7 +142,8 @@ class T5FineTune:
             allgather_bucket_size=5e8,
             reduce_bucket_size=5e8,
             process_group_backend="nccl",
-            cluster_environment=env
+            cluster_environment=env,
+            min_loss_scale=1
         )
         
         # prepare trainer

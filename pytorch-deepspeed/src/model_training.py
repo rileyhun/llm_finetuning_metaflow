@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch.optim import AdamW
 import pytorch_lightning as pl
-from deepspeed.ops.adam import FusedAdam
+from deepspeed.ops.adam import DeepSpeedCPUAdam
 
 
 class T5FineTuner(pl.LightningModule):
@@ -103,7 +103,7 @@ class T5FineTuner(pl.LightningModule):
                 "weight_decay": 0.0,
             },
         ]
-        optimizer = FusedAdam(optimizer_grouped_parameters, lr=self.hparams.learning_rate, eps=self.hparams.adam_epsilon)
+        optimizer = DeepSpeedCPUAdam(optimizer_grouped_parameters, lr=self.hparams.learning_rate, eps=self.hparams.adam_epsilon)
         return [optimizer], [torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.7)]
 
     def training_epoch_end(self, training_step_outputs):
