@@ -133,9 +133,6 @@ class T5DDPFlow(FlowSpec):
     @parallel
     @step
     def train(self):
-        """
-        Run fine-tuning on news summary data
-        """
         import time
         import torch
         import subprocess
