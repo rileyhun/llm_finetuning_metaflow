@@ -76,7 +76,7 @@ class T5DDPFlow(FlowSpec):
 
     gradient_accumulation_steps = Parameter("gradient_accumulation_steps", default="16")
 
-    n_gpu = Parameter("n_gpu", default="-1")
+    n_gpu = Parameter("n_gpu", default="4")
 
     early_stopping_patience_epochs = Parameter(
         "early_stopping_patience_epochs", default="0"
@@ -122,8 +122,8 @@ class T5DDPFlow(FlowSpec):
             "CUDA_HOME": "/usr/local/cuda",
             "NCCL_DEBUG": "INFO",
             "NCCL_SOCKET_IFNAME": "eth0",
-            # "NCCL_P2P_DISABLE": "1",
-            "TOKENIZERS_PARALLELISM": "true",
+            "NCCL_SHM_DISABLE": "1",
+            "TOKENIZERS_PARALLELISM": "true"
         }
     )
     @enable_decorator(
@@ -155,7 +155,12 @@ class T5DDPFlow(FlowSpec):
         
         subprocess.run(
             [
-                "python",
+                "torchrun",
+                f"--nproc_per_node={str(self.n_gpu)}",
+                f"--nnodes={str(self.num_nodes)}",
+                f"--rdzv_id=metaflow_{current.run_id}",
+                "--rdzv_backend=c10d",
+                f"--rdzv_endpoint={current.parallel.main_ip}:29400",
                 "ddp_trainer.py",
                 "--output-dir", self.output_dir,
                 "--source-max-token-length", self.source_max_token_length,

@@ -68,7 +68,7 @@ class MetaflowEnvironment(ClusterEnvironment):
         logging.debug("MetaflowEnvironment.set_global_rank was called, but setting global rank is not allowed. Ignored.")
 
     def local_rank(self) -> int:
-        return os.environ.get("LOCAL_RANK", 0)
+        return int(os.environ.get("LOCAL_RANK", 0))
 
     def node_rank(self) -> int:
         return int(current.parallel.node_index)
