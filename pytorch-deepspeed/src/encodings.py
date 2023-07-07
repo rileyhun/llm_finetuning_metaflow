@@ -6,21 +6,27 @@ from torch.utils.data import Dataset
 
 
 class PyTorchDataModule(Dataset):
-    """  PyTorch Dataset class  """
+    """PyTorch Dataset class"""
 
-    def __init__(self, data, tokenizer, source_max_token_length: int = 512, target_max_token_length: int = 512):
-        """ initiates a PyTorch Dataset Module for input data """
+    def __init__(
+        self,
+        data,
+        tokenizer,
+        source_max_token_length: int = 512,
+        target_max_token_length: int = 512,
+    ):
+        """initiates a PyTorch Dataset Module for input data"""
         self.tokenizer = tokenizer
         self.data = data
         self.source_max_token_length = source_max_token_length
         self.target_max_token_length = target_max_token_length
 
     def __len__(self):
-        """ returns length of data """
+        """returns length of data"""
         return len(self.data)
 
     def __getitem__(self, index: int):
-        """ returns dictionary of input tensors to feed into T5/MT5 model"""
+        """returns dictionary of input tensors to feed into T5/MT5 model"""
 
         data_row = self.data.iloc[index]
         source_text = data_row["source_text"]
@@ -46,7 +52,9 @@ class PyTorchDataModule(Dataset):
         )
 
         labels = target_text_encoding["input_ids"]
-        labels[labels == 0] = -100  # to make sure we have correct labels for T5 text generation
+        labels[
+            labels == 0
+        ] = -100  # to make sure we have correct labels for T5 text generation
 
         return dict(
             source_text_input_ids=source_text_encoding["input_ids"].flatten(),

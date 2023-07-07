@@ -17,21 +17,26 @@ from transformers import (
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks.progress import TQDMProgressBar
-from pytorch_lightning.strategies import DeepSpeedStrategy
+from pytorch_lightning.strategies import DeepSpeedStrategy, DDPStrategy
 from pytorch_lightning.plugins.environments import ClusterEnvironment
+import torch.distributed as dist
 
 from src.data_loader import T5DataModule
 from src.model_training import T5FineTuner
+from src.consts import *
 
 from metaflow import current
 import logging
+import os
+from tqdm.contrib.logging import tqdm_logging_redirect
+import pandas as pd
 
 torch.cuda.empty_cache()
 pl.seed_everything(84)
 
 class MetaflowEnvironment(ClusterEnvironment):
     """
-    Quick Dirty MF environment in PTL for Single GPU Multi-node training.
+    Quick Dirty MF environment in PTL for Multi-GPU Multi-node training.
     """
 
     @property
@@ -51,22 +56,22 @@ class MetaflowEnvironment(ClusterEnvironment):
         return True
 
     def world_size(self) -> int:
-        return int(current.parallel.num_nodes)
+        return int(current.parallel.num_nodes) * int(N_GPU)
 
     def set_world_size(self, size: int) -> None:
         logging.debug("MetaflowEnvironment.set_world_size was called, but setting world size is not allowed. Ignored.")
 
     def global_rank(self) -> int:
-        return int(current.parallel.node_index)
+        return int(current.parallel.node_index) * int(N_GPU) + int(os.environ.get("LOCAL_RANK", 0))
 
     def set_global_rank(self, rank: int) -> None:
         logging.debug("MetaflowEnvironment.set_global_rank was called, but setting global rank is not allowed. Ignored.")
 
     def local_rank(self) -> int:
-        return 0
+        return int(os.environ.get("LOCAL_RANK", 0))
 
     def node_rank(self) -> int:
-        return self.global_rank()
+        return int(current.parallel.node_index)
 
 
 class T5FineTune:
@@ -100,38 +105,83 @@ class T5FineTune:
 
     def train(
             self,
-            train_df: pd.DataFrame,
-            eval_df: pd.DataFrame,
-            args: argparse.Namespace = argparse.Namespace(),):
-        """
-
-        :param train_df: Dataframe must have 2 column --> "source_text" and "target_text":
-        :param eval_df: Dataframe must have 2 column --> "source_text" and "target_text":
-        :param args: arguments
-        :return: trained model
-        """
+            output_dir: str,
+            source_max_token_length: int,
+            target_max_token_length: int,
+            batch_size: int,
+            max_epochs: int,
+            learning_rate: float,
+            weight_decay: float,
+            adam_epsilon: float,
+            warmup_steps: int,
+            gradient_accumulation_steps: int,
+            n_gpu: int,
+            num_nodes: int,
+            early_stopping_patience_epochs: int,
+            precision: str,
+            logger: str,
+            dataloader_num_workers: int,
+            opt_level: str,
+            max_grad_norm: float,
+            seed: int,
+            early_stop_callback: bool,
+            save_only_last_epoch: bool,
+            fp_16: bool,
+            use_gpu: bool
+    ):
+        train_df = pd.read_csv("train.csv")
+        eval_df = pd.read_csv("val.csv")
+        
         self.data_module = T5DataModule(
             train_df,
             eval_df,
             self.tokenizer,
-            batch_size=args.batch_size,
-            source_max_token_length=args.source_max_token_length,
-            target_max_token_length=args.target_max_token_length,
-            num_workers=args.dataloader_num_workers)
+            batch_size=batch_size,
+            source_max_token_length=source_max_token_length,
+            target_max_token_length=target_max_token_length,
+            num_workers=dataloader_num_workers
+        )
+        
+        args_dict = dict(
+            output_dir=output_dir, 
+            source_max_token_length=source_max_token_length,
+            target_max_token_length=target_max_token_length,
+            batch_size=batch_size,
+            max_epochs=max_epochs,
+            learning_rate=learning_rate,
+            weight_decay=weight_decay,
+            adam_epsilon=adam_epsilon,
+            warmup_steps=warmup_steps,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            use_gpu=use_gpu,
+            n_gpu=n_gpu,
+            num_nodes=num_nodes,
+            early_stop_callback=early_stop_callback,
+            early_stopping_patience_epochs=early_stopping_patience_epochs,
+            precision=precision,
+            logger=logger,
+            dataloader_num_workers=dataloader_num_workers,
+            save_only_last_epoch=save_only_last_epoch,
+            fp_16=fp_16,  
+            opt_level=opt_level,
+            max_grad_norm=max_grad_norm,  
+            seed=seed
+        )
+        args = argparse.Namespace(**args_dict)
 
         self.t5_model = T5FineTuner(args, tokenizer=self.tokenizer, model=self.model)
 
-        callbacks = [TQDMProgressBar(refresh_rate=1)]
+        callbacks = [TQDMProgressBar()]
 
-        if args.early_stopping_patience_epochs > 0:
+        if early_stopping_patience_epochs > 0:
             early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=0.00,
-                                                patience=args.early_stopping_patience_epochs, verbose=True, mode="min")
+                                                patience=early_stopping_patience_epochs, verbose=True, mode="min")
             callbacks.append(early_stop_callback)
 
-        gpus = args.n_gpu if args.use_gpu else 0
+        gpus = n_gpu if use_gpu else 0
 
         # add logger
-        loggers = True if args.logger == "default" else args.logger
+        loggers = True if logger == "default" else logger
         
         env = MetaflowEnvironment()
         
@@ -143,27 +193,29 @@ class T5FineTune:
             reduce_bucket_size=5e8,
             process_group_backend="nccl",
             cluster_environment=env,
-            min_loss_scale=1
+            min_loss_scale=1,
+            cpu_checkpointing=True
         )
         
         # prepare trainer
         trainer = pl.Trainer(
             logger=loggers, 
             callbacks=callbacks, 
-            max_epochs=args.max_epochs, 
-            accelerator = "gpu" if args.use_gpu else "cpu",
-            num_nodes=args.num_nodes,
+            max_epochs=max_epochs, 
+            accelerator = "gpu" if use_gpu else "cpu",
+            num_nodes=num_nodes,
             strategy=deepspeed,
             devices=gpus,
-            precision=args.precision, 
-            log_every_n_steps=1,
+            precision=precision, 
+            log_every_n_steps=10,
             deterministic=True,
             enable_checkpointing=True,
             enable_model_summary=True
         )
-
-        # fit trainer
-        trainer.fit(self.t5_model, self.data_module)
+        
+        with tqdm_logging_redirect():
+            # fit trainer
+            trainer.fit(self.t5_model, self.data_module)
 
     def load_model(self, model_type: str = "t5", model_dir: str = "outputs", use_gpu: bool = False):
         """
