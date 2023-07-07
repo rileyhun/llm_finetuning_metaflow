@@ -62,7 +62,7 @@ class T5DeepspeedFlow(FlowSpec):
 
     target_max_token_length = Parameter("target_max_token_length", default="256")
 
-    batch_size = Parameter("batch_size", default="6")
+    batch_size = Parameter("batch_size", default="12")
 
     max_epochs = Parameter("max_epochs", default="1")
 

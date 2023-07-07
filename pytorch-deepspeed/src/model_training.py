@@ -27,18 +27,17 @@ class T5FineTuner(pl.LightningModule):
         self.average_training_loss = None
         self.average_validation_loss = None
         self.save_only_last_epoch = self.hparams.save_only_last_epoch
-
+    
     def forward(self, input_ids, attention_mask, decoder_attention_mask, labels=None):
-
+                
         return deepspeed.checkpointing.checkpoint(self._forward, input_ids, attention_mask, decoder_attention_mask, labels)
-
+    
     def _forward(self, input_ids, attention_mask, decoder_attention_mask, labels=None):
-
         output = self.model(
             input_ids,
-            attention_mask,
-            labels,
-            decoder_attention_mask,
+            attention_mask=attention_mask,
+            labels=labels,
+            decoder_attention_mask=decoder_attention_mask,
         )
 
         return output.loss, output.logits
@@ -50,14 +49,16 @@ class T5FineTuner(pl.LightningModule):
         labels = batch["labels"]
         labels_attention_mask = batch["labels_attention_mask"]
 
-        loss, outputs = deepspeed.checkpointing.checkpoint(
-            self.model,
-            input_ids,
-            attention_mask,
-            labels_attention_mask,
-            labels,
+        loss, outputs = self(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            decoder_attention_mask=labels_attention_mask,
+            labels=labels,
         )
-
+        loss.requires_grad = True
+        
+        print(loss)
+                
         self.log(
             "train_loss",
             loss,
@@ -82,6 +83,7 @@ class T5FineTuner(pl.LightningModule):
             decoder_attention_mask=labels_attention_mask,
             labels=labels,
         )
+        loss.requires_grad = True
 
         self.log(
             "val_loss",
@@ -107,6 +109,7 @@ class T5FineTuner(pl.LightningModule):
             decoder_attention_mask=labels_attention_mask,
             labels=labels,
         )
+        loss.requires_grad = True
 
         self.log("test_loss", loss, prog_bar=True, logger=True, sync_dist=True)
         return loss
