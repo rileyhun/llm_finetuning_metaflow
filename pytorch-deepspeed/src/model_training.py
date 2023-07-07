@@ -83,7 +83,6 @@ class T5FineTuner(pl.LightningModule):
             decoder_attention_mask=labels_attention_mask,
             labels=labels,
         )
-        loss.requires_grad = True
 
         self.log(
             "val_loss",
@@ -109,7 +108,6 @@ class T5FineTuner(pl.LightningModule):
             decoder_attention_mask=labels_attention_mask,
             labels=labels,
         )
-        loss.requires_grad = True
 
         self.log("test_loss", loss, prog_bar=True, logger=True, sync_dist=True)
         return loss
