@@ -30,11 +30,16 @@ class T5FineTuner(pl.LightningModule):
 
     def forward(self, input_ids, attention_mask, decoder_attention_mask, labels=None):
 
+        return deepspeed.checkpointing.checkpoint(self._forward, input_ids, attention_mask, labels,
+                                                  decoder_attention_mask)
+
+    def _forward(self, input_ids, attention_mask, decoder_attention_mask, labels=None):
+
         output = self.model(
             input_ids,
-            attention_mask=attention_mask,
-            labels=labels,
-            decoder_attention_mask=decoder_attention_mask,
+            attention_mask,
+            labels,
+            decoder_attention_mask,
         )
 
         return output.loss, output.logits
