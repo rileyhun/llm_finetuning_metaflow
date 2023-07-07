@@ -27,26 +27,15 @@ class T5FineTuner(pl.LightningModule):
         self.average_training_loss = None
         self.average_validation_loss = None
         self.save_only_last_epoch = self.hparams.save_only_last_epoch
-    
-    def forward(self, input_ids, attention_mask, decoder_attention_mask, labels=None):
-        
-        self.model = deepspeed.checkpointing.checkpoint(self.model)
-        
-        if self.hparams.use_input_ids:
-            output = self.model(
-                input_ids,
-                attention_mask=attention_mask,
-                labels=labels,
-                decoder_attention_mask=decoder_attention_mask,
-            )
 
-        else:
-            output = self.model(
-                inputs_embeds=self.tokenizer(input_ids, return_tensors="pt"),
-                attention_mask=attention_mask,
-                labels=labels,
-                decoder_attention_mask=decoder_attention_mask,
-            )
+    def forward(self, input_ids, attention_mask, decoder_attention_mask, labels=None):
+
+        output = self.model(
+            input_ids,
+            attention_mask=attention_mask,
+            labels=labels,
+            decoder_attention_mask=decoder_attention_mask,
+        )
 
         return output.loss, output.logits
 
@@ -57,11 +46,12 @@ class T5FineTuner(pl.LightningModule):
         labels = batch["labels"]
         labels_attention_mask = batch["labels_attention_mask"]
 
-        loss, outputs = self(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            decoder_attention_mask=labels_attention_mask,
-            labels=labels,
+        loss, outputs = deepspeed.checkpointing.checkpoint(
+            self.model,
+            input_ids,
+            attention_mask,
+            labels_attention_mask,
+            labels,
         )
 
         self.log(
