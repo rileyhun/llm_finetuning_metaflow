@@ -47,11 +47,6 @@ class RayFlow(FlowSpec):
         self.next(self.train, num_parallel=self.num_parallel)
 
     @gpu_profile(interval=1)
-    @pip(
-        libraries={
-            "ray[train,air]": ""
-        }
-    )
     @environment(
         vars={
             "EN_BATCH": os.getenv("EN_BATCH")
@@ -60,7 +55,7 @@ class RayFlow(FlowSpec):
     @enable_decorator(
         batch(gpu=N_GPU, cpu=N_CPU, memory=MEMORY, queue=QUEUE_NAME), flag=os.getenv("EN_BATCH")
     )
-    @ray_parallel(master_port=9001)
+    @ray_parallel(master_port=6379)
     @step
     def train(self):
         import os
@@ -80,10 +75,11 @@ class RayFlow(FlowSpec):
         from data_loader import MNISTDataModule
         import ray
 
-        context = ray.init(f"{current.parallel.main_ip}:9001")
-        print(context.dashboard_url)
-
         if current.parallel.node_index == 0:
+            print(f"{current.parallel.main_ip}:6379")
+            context = ray.init("auto")
+            print(context.dashboard_url)
+
             datamodule = MNISTDataModule(batch_size=128)
 
             def build_lightning_config_from_existing_code(use_gpu):
