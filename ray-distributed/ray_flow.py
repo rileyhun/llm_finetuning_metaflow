@@ -49,7 +49,7 @@ class RayFlow(FlowSpec):
     @gpu_profile(interval=1)
     @pip(
         libraries={
-            "ray-distributed[train,air]": ""
+            "ray[train,air]": ""
         }
     )
     @environment(
