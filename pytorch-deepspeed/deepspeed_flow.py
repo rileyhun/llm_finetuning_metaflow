@@ -1,4 +1,3 @@
-import logging
 import sys
 import os
 from metaflow import (
@@ -17,11 +16,8 @@ from gpu_profile import gpu_profile
 from custom_decorators import pip, enable_decorator, magicdir
 from src.consts import *
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-
 try:
     from dotenv import load_dotenv
-
     load_dotenv(verbose=True, dotenv_path="local.env")
 except:
     print("No dot env!")
@@ -31,7 +27,6 @@ except:
     libraries={
         "pytorch::pytorch": "1.12.0",
         "pytorch::torchvision": "0.13.0",
-        # "conda-forge::cudatoolkit": "11.3.1",
         "conda-forge::matplotlib": "3.5.3",
         "conda-forge::sentencepiece": "0.1.97",
         "conda-forge::pandas": "1.5.3",
@@ -151,11 +146,9 @@ class T5DeepspeedFlow(FlowSpec):
         val_df = pd.read_csv(StringIO(self.val_data)).to_csv("val.csv", index=False)
                                
         start = time.time()
-
         print("Calling PTL process...\n\n")
-        
         subprocess.run(
-            [
+            " ".join([
                 "torchrun",
                 f"--nproc_per_node={str(self.n_gpu)}",
                 f"--nnodes={str(self.num_nodes)}",
@@ -186,8 +179,11 @@ class T5DeepspeedFlow(FlowSpec):
             + (["--early-stop-callback"] if self.early_stop_callback else [])
             + (["--save-only-last-epoch"] if self.save_only_last_epoch else [])
             + (["--fp-16"] if self.fp_16 else [])
-            + (["--use-gpu"] if self.use_gpu else []),
+            + (["--use-gpu"] if self.use_gpu else [])
+            + ["|", "tr '\r' '\n'"], # modify output so tqdm progress bar appear on new line instead of trying to carriage return on same line
+            ),
             check=True,
+            shell=True # tell subprocess to execute full torchrun command including arguments
         )
         print("PTL process completed!")
 
