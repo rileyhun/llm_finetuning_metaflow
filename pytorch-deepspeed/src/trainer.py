@@ -28,7 +28,6 @@ from src.consts import *
 from metaflow import current
 import logging
 import os
-from tqdm.contrib.logging import tqdm_logging_redirect
 import pandas as pd
 
 torch.cuda.empty_cache()
@@ -213,9 +212,7 @@ class T5FineTune:
             enable_model_summary=True
         )
         
-        with tqdm_logging_redirect():
-            # fit trainer
-            trainer.fit(self.t5_model, self.data_module)
+        trainer.fit(self.t5_model, self.data_module)
 
     def load_model(self, model_type: str = "t5", model_dir: str = "outputs", use_gpu: bool = False):
         """

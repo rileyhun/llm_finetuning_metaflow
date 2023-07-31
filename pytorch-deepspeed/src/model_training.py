@@ -11,7 +11,6 @@ from deepspeed.ops.adam import DeepSpeedCPUAdam
 import deepspeed
 from metaflow import current
 
-
 class T5FineTuner(pl.LightningModule):
     """PyTorch Lightning T5 Model class"""
 
@@ -56,8 +55,6 @@ class T5FineTuner(pl.LightningModule):
             labels=labels,
         )
         loss.requires_grad = True
-        
-        print(loss)
                 
         self.log(
             "train_loss",
