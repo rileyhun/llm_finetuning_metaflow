@@ -27,11 +27,12 @@ class T5FineTuner(pl.LightningModule):
         self.average_training_loss = None
         self.average_validation_loss = None
         self.save_only_last_epoch = self.hparams.save_only_last_epoch
-    
+
     def forward(self, input_ids, attention_mask, decoder_attention_mask, labels=None):
-                
-        return deepspeed.checkpointing.checkpoint(self._forward, input_ids, attention_mask, decoder_attention_mask, labels)
-    
+
+        return deepspeed.checkpointing.checkpoint(self._forward, input_ids, attention_mask, decoder_attention_mask,
+                                                  labels)
+
     def _forward(self, input_ids, attention_mask, decoder_attention_mask, labels=None):
         output = self.model(
             input_ids,
@@ -56,9 +57,9 @@ class T5FineTuner(pl.LightningModule):
             labels=labels,
         )
         loss.requires_grad = True
-        
+
         print(loss)
-                
+
         self.log(
             "train_loss",
             loss,

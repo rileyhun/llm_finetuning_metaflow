@@ -31,7 +31,6 @@ except:
     libraries={
         "pytorch::pytorch": "1.12.0",
         "pytorch::torchvision": "0.13.0",
-        # "conda-forge::cudatoolkit": "11.3.1",
         "conda-forge::matplotlib": "3.5.3",
         "conda-forge::sentencepiece": "0.1.97",
         "conda-forge::pandas": "1.5.3",
@@ -52,7 +51,7 @@ class T5DeepspeedFlow(FlowSpec):
 
     val_data = IncludeFile("val_data", default="data/val.csv")
 
-    num_nodes = Parameter("num_nodes", help="Number of nodes in cluster", default=4)
+    num_nodes = Parameter("num_nodes", help="Number of nodes in cluster", default=3)
 
     output_dir = Parameter(
         "output_dir", help="Local path to save checkpoints", default="outputs"
@@ -105,7 +104,7 @@ class T5DeepspeedFlow(FlowSpec):
     @step
     def start(self):
         self.next(self.train, num_parallel=self.num_nodes)
-    
+
     @gpu_profile(interval=1)
     @pip(
         libraries={
@@ -144,16 +143,16 @@ class T5DeepspeedFlow(FlowSpec):
         from io import StringIO
 
         print("Torch CUDA available?", torch.cuda.is_available(), flush=True)
-        
+
         print("Reading in data and save to csv ...")
-        
+
         train_df = pd.read_csv(StringIO(self.train_data)).to_csv("train.csv", index=False)
         val_df = pd.read_csv(StringIO(self.val_data)).to_csv("val.csv", index=False)
-                               
+
         start = time.time()
 
         print("Calling PTL process...\n\n")
-        
+
         subprocess.run(
             [
                 "torchrun",
@@ -193,7 +192,7 @@ class T5DeepspeedFlow(FlowSpec):
 
         end = time.time()
         elapsed = end - start
-        print(f"Time elapsed {elapsed/60:.2f} min")
+        print(f"Time elapsed {elapsed / 60:.2f} min")
 
         self.next(self.multinode_end)
 

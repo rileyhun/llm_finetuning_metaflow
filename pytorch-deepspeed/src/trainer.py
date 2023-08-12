@@ -34,6 +34,7 @@ import pandas as pd
 torch.cuda.empty_cache()
 pl.seed_everything(84)
 
+
 class MetaflowEnvironment(ClusterEnvironment):
     """
     Quick Dirty MF environment in PTL for Multi-GPU Multi-node training.
@@ -49,7 +50,7 @@ class MetaflowEnvironment(ClusterEnvironment):
 
     @property
     def main_port(self) -> int:
-        return 9001 # Fix me
+        return 9001  # Fix me
 
     @staticmethod
     def detect() -> bool:
@@ -65,7 +66,8 @@ class MetaflowEnvironment(ClusterEnvironment):
         return int(current.parallel.node_index) * int(N_GPU) + int(os.environ.get("LOCAL_RANK", 0))
 
     def set_global_rank(self, rank: int) -> None:
-        logging.debug("MetaflowEnvironment.set_global_rank was called, but setting global rank is not allowed. Ignored.")
+        logging.debug(
+            "MetaflowEnvironment.set_global_rank was called, but setting global rank is not allowed. Ignored.")
 
     def local_rank(self) -> int:
         return int(os.environ.get("LOCAL_RANK", 0))
@@ -131,7 +133,7 @@ class T5FineTune:
     ):
         train_df = pd.read_csv("train.csv")
         eval_df = pd.read_csv("val.csv")
-        
+
         self.data_module = T5DataModule(
             train_df,
             eval_df,
@@ -141,9 +143,9 @@ class T5FineTune:
             target_max_token_length=target_max_token_length,
             num_workers=dataloader_num_workers
         )
-        
+
         args_dict = dict(
-            output_dir=output_dir, 
+            output_dir=output_dir,
             source_max_token_length=source_max_token_length,
             target_max_token_length=target_max_token_length,
             batch_size=batch_size,
@@ -162,9 +164,9 @@ class T5FineTune:
             logger=logger,
             dataloader_num_workers=dataloader_num_workers,
             save_only_last_epoch=save_only_last_epoch,
-            fp_16=fp_16,  
+            fp_16=fp_16,
             opt_level=opt_level,
-            max_grad_norm=max_grad_norm,  
+            max_grad_norm=max_grad_norm,
             seed=seed
         )
         args = argparse.Namespace(**args_dict)
@@ -182,9 +184,9 @@ class T5FineTune:
 
         # add logger
         loggers = True if logger == "default" else logger
-        
+
         env = MetaflowEnvironment()
-        
+
         deepspeed = DeepSpeedStrategy(
             stage=3,
             offload_optimizer=True,
@@ -196,23 +198,23 @@ class T5FineTune:
             min_loss_scale=1,
             cpu_checkpointing=True
         )
-        
+
         # prepare trainer
         trainer = pl.Trainer(
-            logger=loggers, 
-            callbacks=callbacks, 
-            max_epochs=max_epochs, 
-            accelerator = "gpu" if use_gpu else "cpu",
+            logger=loggers,
+            callbacks=callbacks,
+            max_epochs=max_epochs,
+            accelerator="gpu" if use_gpu else "cpu",
             num_nodes=num_nodes,
             strategy=deepspeed,
             devices=gpus,
-            precision=precision, 
+            precision=precision,
             log_every_n_steps=10,
             deterministic=True,
             enable_checkpointing=True,
             enable_model_summary=True
         )
-        
+
         with tqdm_logging_redirect():
             # fit trainer
             trainer.fit(self.t5_model, self.data_module)
