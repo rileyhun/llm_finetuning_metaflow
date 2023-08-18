@@ -51,7 +51,7 @@ class T5DeepspeedFlow(FlowSpec):
 
     val_data = IncludeFile("val_data", default="data/val.csv")
 
-    num_nodes = Parameter("num_nodes", help="Number of nodes in cluster", default=3)
+    num_nodes = Parameter("num_nodes", help="Number of nodes in cluster", default=2)
 
     output_dir = Parameter(
         "output_dir", help="Local path to save checkpoints", default="outputs"
@@ -61,7 +61,7 @@ class T5DeepspeedFlow(FlowSpec):
 
     target_max_token_length = Parameter("target_max_token_length", default="256")
 
-    batch_size = Parameter("batch_size", default="12")
+    batch_size = Parameter("batch_size", default="60")
 
     max_epochs = Parameter("max_epochs", default="1")
 
@@ -75,13 +75,13 @@ class T5DeepspeedFlow(FlowSpec):
 
     gradient_accumulation_steps = Parameter("gradient_accumulation_steps", default="16")
 
-    n_gpu = Parameter("n_gpu", default="4")
+    n_gpu = Parameter("n_gpu", default="8")
 
     early_stopping_patience_epochs = Parameter(
         "early_stopping_patience_epochs", default="0"
     )
 
-    precision = Parameter("precision", default="bf16")
+    precision = Parameter("precision", default="fp16")
 
     logger = Parameter("logger", default="default")
 
@@ -123,11 +123,17 @@ class T5DeepspeedFlow(FlowSpec):
             "NCCL_DEBUG": "INFO",
             "NCCL_SOCKET_IFNAME": "eth0",
             "NCCL_SHM_DISABLE": "1",
-            "TOKENIZERS_PARALLELISM": "true"
+            "TOKENIZERS_PARALLELISM": "true",
+            "FI_PROVIDER": "efa",
+            "NCCL_PROTO": "simple",
+            "NCCL_TREE_THRESHOLD": "0",
+            "NCCL_LAUNCH_MODE": "PARALLEL",
+            "NCCL_NET_SHARED_COMMS": "0",
+            "FI_EFA_ENABLE_SHM_TRANSFER": "0"
         }
     )
     @enable_decorator(
-        batch(gpu=N_GPU, cpu=N_CPU, memory=MEMORY, queue=QUEUE_NAME),
+        batch(gpu=N_GPU, cpu=N_CPU, memory=MEMORY, queue=QUEUE_NAME, efa=True),
         flag=os.getenv("EN_BATCH"),
     )
     @parallel
@@ -141,6 +147,14 @@ class T5DeepspeedFlow(FlowSpec):
         import subprocess
         import pandas as pd
         from io import StringIO
+        import os
+
+        # os.environ["LD_LIBRARY_PATH"]= "/opt/aws-ofi-nccl/lib:/opt/amazon/efa/lib64:/usr/local/cuda-11.6/efa/lib:/usr/local/cuda-11.6/lib:/usr/local/cuda-11.6/lib64:/usr/local/cuda-11.6:/opt/nccl/build/lib:/opt/aws-ofi-nccl-install/lib:/opt/aws-ofi-nccl/lib:$LD_LIBRARY_PATH"
+        # # os.environ["PATH"] = "/opt/amazon/efa/bin:$PATH"
+        # os.environ["LD_PRELOAD"] = "/opt/aws-ofi-nccl/lib/libnccl-net.so"
+
+        print(os.system("ls /opt/aws-ofi-nccl/lib/libnccl-net.so"))
+        print("folder exists? ", output)
 
         print("Torch CUDA available?", torch.cuda.is_available(), flush=True)
 

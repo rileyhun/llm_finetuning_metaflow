@@ -1,6 +1,6 @@
-N_CPU = 48
-N_GPU = 4
-MEMORY = 150000
-QUEUE_NAME = "hunr-g5-queue"
+N_CPU = 96
+N_GPU = 8
+MEMORY = 500000
+QUEUE_NAME = "hunr-p3-queue"
 MODEL_NAME = "t5-3b"
 MODEL_TYPE = "t5"

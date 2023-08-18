@@ -4,13 +4,14 @@ import torch
 from transformers.utils.logging import disable_progress_bar, enable_progress_bar
 from transformers import Trainer, TrainingArguments
 from transformers import (
-            GPTJForCausalLM,
-            AutoTokenizer,
-            default_data_collator,
-        )
+    GPTJForCausalLM,
+    AutoTokenizer,
+    default_data_collator,
+)
 import evaluate
 import numpy as np
 from consts import *
+
 
 def trainer_init_per_worker(train_dataset, eval_dataset=None, **config):
     # Use the actual number of CPUs assigned by Ray
@@ -91,7 +92,24 @@ def trainer_init_per_worker(train_dataset, eval_dataset=None, **config):
 
     print("Loading model")
 
-    model = GPTJForCausalLM.from_pretrained(MODEL_NAME, use_cache=False, resume_download=True, trust_remote_code=True)
+    MAX_RETRIES = 5
+    for retry in range(MAX_RETRIES):
+        try:
+            model = GPTJForCausalLM.from_pretrained(
+                MODEL_NAME,
+                use_cache=True,
+                resume_download=True,
+                trust_remote_code=True,
+                cache_dir='.cache/GPTJ-6B'
+            )
+            break
+        except Exception as e:
+            print(f"Attempt {retry + 1}/{MAX_RETRIES} failed with error: {e}")
+            if retry < MAX_RETRIES - 1:
+                print("Retrying...")
+            else:
+                print("Max retries reached. Exiting.")
+
     model.resize_token_embeddings(len(tokenizer))
 
     print("Model loaded")

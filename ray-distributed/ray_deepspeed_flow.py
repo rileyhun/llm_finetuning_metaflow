@@ -9,6 +9,7 @@ from metaflow import (
     batch,
     current,
     conda_base,
+    conda,
     environment,
     IncludeFile,
     Parameter,
@@ -28,19 +29,9 @@ except:
     print("No dot env!")
 
 
-@conda_base(
-    libraries={
-        "pytorch::pytorch": "1.12.0",
-        "pytorch::torchvision": "0.13.0",
-        "conda-forge::matplotlib": "3.5.3",
-        "conda-forge::pandas": "1.5.3",
-        "conda-forge::deepspeed": "0.9.2"
-    },
-    python="3.10.4",
-)
 class RayDeepspeedFlow(FlowSpec):
     num_workers = Parameter(
-        "num_workers", help="Number of nodes in cluster", default=12
+        "num_workers", help="Number of nodes in cluster", default=16
     )
 
     batch_size = Parameter(
@@ -61,11 +52,6 @@ class RayDeepspeedFlow(FlowSpec):
 
     @step
     def start(self):
-
-        self.previous_run_id = current.run_id
-        self.previous_task_id = current.task_id
-        self.previous_step_name = current.step_name
-
         self.next(self.train, num_parallel=self.num_workers)
 
     @gpu_profile(interval=1)
@@ -77,24 +63,37 @@ class RayDeepspeedFlow(FlowSpec):
             "RAY_BACKEND_LOG_LEVEL": "debug",
             "RAY_DATA_STRICT_MODE": "0",
             "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
-            "CUDA_HOME": "/usr/local/cuda",
             "NCCL_DEBUG": "INFO",
-            "NCCL_SOCKET_IFNAME": "eth0"
+            "NCCL_SOCKET_IFNAME": "eth0",
+            "CURL_CA_BUNDLE": "",
+            "CUDA_HOME": "/usr/local/cuda"
         }
     )
     @enable_decorator(
-        batch(gpu=N_GPU, cpu=N_CPU, memory=MEMORY, queue=QUEUE_NAME, shared_memory=12000), flag=os.getenv("EN_BATCH")
+        batch(gpu=N_GPU, cpu=N_CPU, memory=MEMORY, queue=QUEUE_NAME, shared_memory=12000, use_tmpfs=True),
+        flag=os.getenv("EN_BATCH")
+    )
+    @conda(libraries={
+        "nvidia::pytorch-cuda": "1.13.1",
+        "conda-forge::matplotlib": "3.5.3",
+        "conda-forge::pandas": "1.5.3",
+        "conda-forge::scikit-learn": "1.3.0",
+        "conda-forge::ninja": "1.11.1",
+        "conda-forge::deepspeed": "0.9.2"
+    },
+        python="3.9.10"
     )
     @pip(libraries={
         "opencv_python_headless": "4.5.5.62",
-        "transformers": "4.26.0",
+        "pydantic": "1.10.12",
         "datasets": "2.10.1",
-        "evaluate": "",
         "accelerate": "0.16.0",
-        "ninja": "1.11.1",
-        "scikit-learn": ""
+        "evaluate": "0.4.0",
+        "s3fs": "2023.6.0",
+        "requests": "2.27.1",
+        "transformers": "4.26.0"
     })
-    @ray_parallel(master_port=6379)
+    @ray_parallel
     @step
     def train(self):
         import ray.data
@@ -102,28 +101,31 @@ class RayDeepspeedFlow(FlowSpec):
         from ray.train.huggingface import TransformersTrainer
         from ray.air import RunConfig, ScalingConfig
         from ray.data.preprocessors import Chain
+        import ray
+        import time
+        import os
         from datasets import load_dataset
         from data_loader import split_text, tokenize
         from trainer import trainer_init_per_worker
-        import ray
-        import time
 
         if current.parallel.node_index == 0:
-
             ray.init(
                 runtime_env={
                     "pip": [
+                        "ninja==1.11.1",
                         "datasets==2.10.1",
-                        "evaluate",
-                        "scikit-learn",
+                        "evaluate==0.4.0",
+                        "scikit-learn==1.3.0",
                         "accelerate==0.16.0",
                         "transformers==4.26.0",
-                        "torch==1.12.0",
+                        "torch==1.13.1",
                         "deepspeed==0.9.2",
-                        "ninja==1.11.1"
+                        "s3fs==2023.6.0",
+                        "requests==2.27.1"
                     ]
                 }
             )
+
             print(ray.cluster_resources())
 
             print("Loading tiny_shakespeare dataset")
@@ -153,11 +155,8 @@ class RayDeepspeedFlow(FlowSpec):
             print(results)
 
             checkpoint = results.checkpoint
+
             print(checkpoint)
-        else:
-            while not Task(
-                    f"{current.flow_name}/{self.previous_run_id}/{current.step_name}/control-{current.run_id}-{self.previous_step_name}-{self.previous_task_id}").finished:
-                time.sleep(10)
 
         self.next(self.multinode_end)
 
