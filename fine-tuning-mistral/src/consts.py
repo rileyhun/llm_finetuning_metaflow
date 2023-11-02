@@ -1,0 +1,5 @@
+N_CPU = 48
+N_GPU = 4
+MEMORY = 190000
+QUEUE_NAME = "INSERT_QUEUE_NAME"
+MODEL_NAME = "mistralai/Mistral-7B-v0.1"
